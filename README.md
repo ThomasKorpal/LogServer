@@ -1,7 +1,5 @@
 # LogServer
 
- ----------------------------------------------- (ENG) -----------------------------------------------
-
 This project is a client/server log server application. It lets you send messages to a server which will store them in a log file. 
 
 In order to execute the program, you need to :
@@ -24,3 +22,17 @@ You do not need a specific order for the options, nor do you need to enter both 
 The program will also verify the validity and the existence of the log directory, the validity of the server port and the validity of the IP address (if they're given in the options).
 
 There are two configuration file, one for the server, one for the client. If no options are given, the values inside these files will serve as default values.
+
+Test protocol : 
+
+  - ./server
+  - Open the file given by the server (printed in the terminal)
+  - Open another terminal
+  - In that terminal -> ./client
+  - Enter one name
+  - Send a message
+  - Open another terminal
+  - Enter another name
+  - Send a message
+  - Quit both clients by writing "exit"
+  - Quit the server using Ctrl + C
