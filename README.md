@@ -23,4 +23,4 @@ Command options :
 You do not need a specific order for the options, nor do you need to enter both of them in the same command.
 The program will also verify the validity and the existence of the log directory, the validity of the server port and the validity of the IP address (if they're given in the options).
 
-There are two configuration file, one for the server, one for the client.
+There are two configuration file, one for the server, one for the client. If no options are given, the values inside these files will serve as default values.
