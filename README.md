@@ -32,6 +32,7 @@ Test protocol :
   - Enter one name
   - Send a message
   - Open another terminal
+  - Execute ./client
   - Enter another name
   - Send a message
   - Quit both clients by writing "exit"
