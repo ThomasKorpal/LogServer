@@ -262,7 +262,7 @@ void setConfigValuesServer(int argc, char* argv[])
 
             break;
         default:
-            Die("Incorrect usage of the command : ./server (--log_directory=<port>) (--log_directory=<log_directory>)");
+            Die("Incorrect usage of the command : ./server (--server_port=<port>) (--log_directory=<log_directory>)");
             break;
     }
 
@@ -382,7 +382,12 @@ int main(int argc, char* argv[])
             char client_info[INET_ADDRSTRLEN];
             inet_ntop(AF_INET, &echoclient.sin_addr, client_info, sizeof(client_info));
             HandleClient(clientsock,log_file,client_info);
-            if(fgets(command, sizeof(command), stdin) == NULL)
+        }
+        else if(childPid > 0)
+        {
+            //parent process
+            close(clientsock);
+            /*if(fgets(command, sizeof(command), stdin) == NULL)
             {
                 close(serversock);
                 Die("Failed to read from stdin\n");
@@ -397,12 +402,7 @@ int main(int argc, char* argv[])
             if(!strcmp("quit", command))
             {
                 break;
-            }
-        }
-        else if(childPid > 0)
-        {
-            //parent process
-            close(clientsock);
+            }*/
             waitpid(childPid, NULL, WNOHANG);
         }
         else

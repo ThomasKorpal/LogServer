@@ -44,6 +44,13 @@ int isIPValid(char* ip_str)
     return 1; 
 }
 
+int isANumber(const char *str) 
+{
+    char *endptr;
+    strtol(str, &endptr, 10);
+    return *endptr == '\0';
+}
+
 void setConfigValuesClient(int argc, char* argv[])
 {   
     if(argc < 3 && argc > 0)
