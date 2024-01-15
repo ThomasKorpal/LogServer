@@ -46,9 +46,9 @@ int isIPValid(char* ip_str)
 
 int isANumber(const char *str) 
 {
-    char *endptr;
-    strtol(str, &endptr, 10);
-    return *endptr == '\0';
+    char *endcarac;
+    strtol(str, &endcarac, 10);
+    return *endcarac == '\0';
 }
 
 void setConfigValuesClient(int argc, char* argv[])
@@ -283,6 +283,12 @@ int main(int argc, char* argv[])
     memset(headerBuff, 0, BUFFSIZE);
     memset(buffer, 0, BUFFSIZE);
     printf("Closing client socket... \n");
+    strcpy(headerBuff,"exit");
+    if(send(client_socket, headerBuff, strlen(headerBuff),0) != strlen(headerBuff))
+    {
+        close(client_socket);
+        Die("Wrong number of sent bytes\n");
+    }
     close(client_socket);
     exit(EXIT_SUCCESS);
 }

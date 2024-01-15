@@ -17,6 +17,7 @@
 #include <semaphore.h>
 #include <dirent.h>
 #include <sys/stat.h>
+#include <sys/select.h>
 
 void Die(char *mess);
 int HandleClient(int sock, char* log_file, char* client_info) ;

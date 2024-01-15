@@ -8,26 +8,12 @@ char log_dir[150];
 int s_flag = 0;
 char command[100];
 
-int serversockT, clientsockT;
-
 sem_t sem_file;
 
 void Die(char *mess) 
 { 
     perror(mess); 
     exit(EXIT_FAILURE); 
-}
-
-void handleSignal(int signal)
-{
-    if(signal == SIGINT || signal == SIGTERM)
-    {
-        printf("Server shutting down...");
-        close(serversockT);
-        close(clientsockT);
-        sem_destroy(&sem_file);
-        exit(EXIT_SUCCESS);
-    }
 }
 
 int isANumber(const char *str) 
@@ -37,16 +23,12 @@ int isANumber(const char *str)
     return *endptr == '\0';
 }
 
-//Fonction permettant de l'envoi et reception de messages selon les requetes du client
 int HandleClient(int sock, char* log_file, char* client_info) 
 {
     char bufferC[BUFFSIZE];
     sem_wait(&sem_file);
     int log = open(log_file, O_WRONLY | O_CREAT | O_APPEND, 0644);
-    //FILE *log = fopen(log_file, "a");
     sem_post(&sem_file);
-
-    clientsockT = sock;
 
     if (log == -1)
     {
@@ -66,7 +48,7 @@ int HandleClient(int sock, char* log_file, char* client_info)
         Die("Error writing to log file.");
     }
     sem_post(&sem_file);
-
+    memset(log_message, 0, BUFFSIZE);
 
     while(1)
     {
@@ -76,15 +58,32 @@ int HandleClient(int sock, char* log_file, char* client_info)
         {
             break;
         }
-        strcat(bufferC,"\n");
 
-        sem_wait(&sem_file);
-        ssize_t bytesWriteMes = write(log,bufferC,strlen(bufferC));
-        if(bytesWriteMes == -1)
+        if(!strcmp(bufferC,"exit"))
         {
-            Die("Error writing to log file.");
+            time(&current_time);
+            snprintf(log_message,BUFFSIZE,"Client %s disconnected at %s", client_info, ctime(&current_time));
+            sem_wait(&sem_file);
+            ssize_t bytesWriteCon = write(log,log_message,strlen(log_message));
+            if(bytesWriteCon == -1)
+            {
+                Die("Error writing to log file.");
+            }
+            sem_post(&sem_file);
+            memset(log_message, 0, BUFFSIZE);
+
         }
-        sem_post(&sem_file);
+        else
+        {
+            strcat(bufferC,"\n");
+            sem_wait(&sem_file);
+            ssize_t bytesWriteMes = write(log,bufferC,strlen(bufferC));
+            if(bytesWriteMes == -1)
+            {
+                Die("Error writing to log file.");
+            }
+            sem_post(&sem_file);
+        }
         
         memset(bufferC, 0, BUFFSIZE);
     }
@@ -116,7 +115,6 @@ void setConfigValuesServer(int argc, char* argv[])
         bytesRead = read(config_file,buffer,55);
         buffer[bytesRead]='\0';
         strtok(buffer,"=");
-        //log_dir = strtok(NULL,"=");
         strcpy(log_dir,strtok(NULL,"="));
         if(!strcmp(log_dir," "))
         {
@@ -266,7 +264,6 @@ void setConfigValuesServer(int argc, char* argv[])
             break;
     }
 
-    //add verification that the log directory exists or create it
     DIR* dir = opendir(log_dir);
     if(dir)
     {
@@ -290,8 +287,6 @@ void generateUniqueFilename(char *filename, size_t size)
 {
     time_t current_time = time(NULL);
     struct tm *local_time = localtime(&current_time);
-
-    // Utilisez la partie temporelle du nom de fichier
     strftime(filename, size, "log%d%m%Y_%H:%M:%S.txt", local_time);
 }
 
@@ -321,30 +316,23 @@ int main(int argc, char* argv[])
     int serversock, clientsock;
     struct sockaddr_in echoserver, echoclient;
 
-    //Creation du socket server
     serversock = socket(AF_INET, SOCK_STREAM, 0);
     if(serversock == -1) 
     {
         Die("Failed to create socket");
     }
 
-    serversockT = serversock;
+    memset(&echoserver, 0, sizeof(echoserver));
+    echoserver.sin_family = AF_INET;                  
+    echoserver.sin_addr.s_addr = htonl(INADDR_ANY);   
+    echoserver.sin_port = htons(server_port);                
 
-    //Construction du sockaddr_in du server
-    memset(&echoserver, 0, sizeof(echoserver));       // Clear struct
-    echoserver.sin_family = AF_INET;                  // Internet/IP 
-    echoserver.sin_addr.s_addr = htonl(INADDR_ANY);   // Incoming addr
-    echoserver.sin_port = htons(server_port);                // server port
-
-
-    // Bind le socket server
     if(bind(serversock, (struct sockaddr *) &echoserver, sizeof(echoserver)) == -1) 
     {
         close(serversock);
         Die("Failed to bind the server socket");
     }
 
-    // Listen d'une connection sur le server socket
     if(listen(serversock, MAX_CLIENTS) == -1) 
     {
         close(serversock);
@@ -355,64 +343,84 @@ int main(int argc, char* argv[])
     printf("Creating log file...\n");
     char* log_file = createLogFile(log_dir);
     printf("New log file created : %s\n",log_file);
-    signal(SIGINT,exit);
 
-    //Le server tourne en boucle en attendant une connection
+    int flags = fcntl(STDIN_FILENO, F_GETFL, 0);
+    fcntl(STDIN_FILENO, F_SETFL, flags | O_NONBLOCK);
+
+    fd_set read_fds;
+    struct timeval timeout;
+
     while(1)
     {
-        unsigned int clientlen = sizeof(echoclient);
-        //Connection avec le client
-        if ((clientsock = accept(serversock, (struct sockaddr *) &echoclient, &clientlen)) == -1) 
-        {
-            Die("Failed to accept client connection");
-        }
-        printf("Client connected: %s\n", inet_ntoa(echoclient.sin_addr));
+        FD_ZERO(&read_fds);
+        FD_SET(STDIN_FILENO, &read_fds);
+        FD_SET(serversock, &read_fds);
 
-        pid_t childPid = fork();
+        timeout.tv_sec = 0;
+        timeout.tv_usec = 100000; // 100 ms
 
-        if(childPid == -1)
+        int select_result = select(serversock + 1, &read_fds, NULL, NULL, &timeout);
+
+        if (select_result == -1)
         {
-            close(serversock);
-            close(clientsock);
-            Die("Unable to fork.");
+            Die("Error in select");
         }
-        if(childPid == 0)
+
+        if (FD_ISSET(STDIN_FILENO, &read_fds))
         {
-            //child process
-            char client_info[INET_ADDRSTRLEN];
-            inet_ntop(AF_INET, &echoclient.sin_addr, client_info, sizeof(client_info));
-            HandleClient(clientsock,log_file,client_info);
+            if (fgets(command, sizeof(command), stdin) != NULL)
+            {
+                size_t command_len = strlen(command);
+                if (command_len > 0 && command[command_len - 1] == '\n')
+                {
+                    command[command_len - 1] = '\0';
+                }
+
+                if (!strcmp(command, "exit"))
+                {
+                    break;
+                }
+            }
         }
-        else if(childPid > 0)
+
+        if (FD_ISSET(serversock, &read_fds))
         {
-            //parent process
-            close(clientsock);
-            /*if(fgets(command, sizeof(command), stdin) == NULL)
+            unsigned int clientlen = sizeof(echoclient);
+
+            if ((clientsock = accept(serversock, (struct sockaddr *) &echoclient, &clientlen)) == -1) 
+            {
+                Die("Failed to accept client connection");
+            }
+            printf("Client connected: %s\n", inet_ntoa(echoclient.sin_addr));
+
+            pid_t childPid = fork();
+
+            if(childPid == -1)
             {
                 close(serversock);
-                Die("Failed to read from stdin\n");
+                close(clientsock);
+                Die("Unable to fork.");
             }
-
-            size_t bufferlen = strlen(command);
-            if(bufferlen > 0)
+            if(childPid == 0)
             {
-                command[bufferlen - 1] = '\0';
+                char client_info[INET_ADDRSTRLEN];
+                inet_ntop(AF_INET, &echoclient.sin_addr, client_info, sizeof(client_info));
+                HandleClient(clientsock,log_file,client_info);
             }
-
-            if(!strcmp("quit", command))
+            else if(childPid > 0)
             {
-                break;
-            }*/
-            waitpid(childPid, NULL, WNOHANG);
-        }
-        else
-        {
-            close(serversock);
-            close(clientsock);
-            Die("Fork failed.");
+                close(clientsock);
+                waitpid(childPid, NULL, WNOHANG);
+            }
+            else
+            {
+                close(serversock);
+                close(clientsock);
+                Die("Fork failed.");
+            }
         }
     }
-    printf("Server shutting down...");
+    printf("Server shutting down...\n");
     close(serversock);
     close(clientsock);
     sem_destroy(&sem_file);
