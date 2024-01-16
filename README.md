@@ -37,3 +37,5 @@ Test protocol :
   - Send a message
   - Quit both clients by writing "exit"
   - Quit the server by writing "exit"
+  
+(You'll also find a Python script called test.py which is my attempt on test scripting this program. I'm not 100% sure it works as I didn't have the time to continue working on it)
