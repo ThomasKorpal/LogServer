@@ -325,6 +325,7 @@ int main(int argc, char* argv[])
         close(client_socket);
         Die("Wrong number of sent bytes\n");
     }
+    shutdown(client_socket,SHUT_RDWR);
     close(client_socket);
     exit(EXIT_SUCCESS);
 }

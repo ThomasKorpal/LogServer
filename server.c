@@ -66,6 +66,7 @@ int HandleClient(int sock, char* log_file, char* client_info)
         ssize_t bytes_received = recv(sock, bufferC, sizeof(bufferC), 0);
         if(bytes_received <= 0) 
         {
+            //Die("Problem when receiving from client");
             break;
         }
 
@@ -481,8 +482,15 @@ int main(int argc, char* argv[])
     }
     //Shutting down sequence 
     printf("Server shutting down...\n");
-    close(serversock);
     close(clientsock);
+    if(!shutdown(serversock,SHUT_RDWR))
+    {
+        close(serversock);
+    }
+    else
+    {
+        Die("Cannot shutdown server socket");
+    }
     sem_destroy(&sem_file);
     return 0;
 }
